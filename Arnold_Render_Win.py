@@ -22,11 +22,11 @@ for a in arnoldPaths:
 try:
 	from arnold import *
 except:
+	# Will warn you if Arnold render path is not assigned in your environment
 	warnings.warn("Add Arnold to environment variable and re-open this window")
 
 
 from PyQt5 import QtCore, QtGui, QtWidgets
-
 
 
 class Ui_AR_Win(object):
@@ -75,7 +75,7 @@ class Ui_AR_Win(object):
 
 		# Attach horizontal that holds all buttons to the main vertical one
 		self.verticalLayout.addLayout(self.horizontalLayout)
-		self.Render_result = QtWidgets.QWidget(self.centralwidget)
+		self.Render_result = QtWidgets.QFrame(self.centralwidget)
 
 		# Render result widget that will show rendered jpeg
 		sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Fixed)
@@ -95,7 +95,8 @@ class Ui_AR_Win(object):
 		self.LogOutput.setObjectName("LogOutput")
 
 		# Create log output widget content that will be shown from log file
-		self.scrollAreaWidgetContents = QtWidgets.QWidget()
+		self.scrollAreaWidgetContents = QtWidgets.QTextEdit()
+		self.scrollAreaWidgetContents.setReadOnly(True)
 		self.scrollAreaWidgetContents.setGeometry(QtCore.QRect(0, 0, 878, 69))
 		self.scrollAreaWidgetContents.setObjectName("scrollAreaWidgetContents")
 		self.LogOutput.setWidget(self.scrollAreaWidgetContents)
@@ -109,7 +110,7 @@ class Ui_AR_Win(object):
 		_translate = QtCore.QCoreApplication.translate
 		AR_Win.setWindowTitle(_translate("Arnold Win", "Arnold Win"))
 		self.Render_Button.setText(_translate("Arnold Win", "Render"))
-		self.Color_Button.setText(_translate("Arnold Win", "Color"))
+		self.Color_Button.setText(_translate("Arnold Win", "Object color"))
 
 
 class MyWin(QtWidgets.QMainWindow):
@@ -120,11 +121,26 @@ class MyWin(QtWidgets.QMainWindow):
 		self.ui = Ui_AR_Win()
 		self.ui.setupUi(self)
 
+		# Connect functions to the buttons
 		self.ui.Render_Button.clicked.connect(self.Render)
 		self.ui.Color_Button.clicked.connect(self.Picker)
 
+		# Set dark grey color to the main window
+		self.setStyleSheet( 'QMainWindow{ background-color:#1f1f1f }' )
+
+		# Set dark grey color to tehe Render button
+		self.ui.Render_Button.setStyleSheet( 'QPushButton{ background-color: #444444; border: 1px solid #4d4d4d; color: #919c9c }' )
+
 		# Set the initial color as red one
 		self.col = (1.0, 0.02, 0.02)
+		init_Color_Button = [ x * 255.0 for x in self.col ]
+		self.ui.Color_Button.setStyleSheet( 'QPushButton{ background-color:rgb(%s,%s,%s); border: 1px solid #4d4d4d }' % ( init_Color_Button[0], init_Color_Button[1], init_Color_Button[2] ) )
+
+		# Set Render Image widget color
+		self.ui.Render_result.setStyleSheet( 'QFrame { border: 1px solid #414141 }' )
+
+		# Set Log Output text color
+		self.ui.scrollAreaWidgetContents.setStyleSheet( 'QTextEdit { background-color: #444444; border: 1px solid #414141; color: #919c9c }' )
 
 	# Called when the Render button is pressed
 	def Render(self):
@@ -170,8 +186,8 @@ class MyWin(QtWidgets.QMainWindow):
 			# get the global options node and set some options
 			options = AiUniverseGetOptions()
 			AiNodeSetInt(options, "AA_samples", 8)
-			AiNodeSetInt(options, "xres", 480)
-			AiNodeSetInt(options, "yres", 360)
+			AiNodeSetInt(options, "xres", 880)
+			AiNodeSetInt(options, "yres", 550)
 			AiNodeSetInt(options, "GI_diffuse_depth", 4)
 
 			# set the active camera (optional, since there is only one camera)
@@ -198,7 +214,21 @@ class MyWin(QtWidgets.QMainWindow):
 
 			# Arnold session shutdown
 			AiEnd()
+
+			imagePath = sys.argv[0].rsplit( '\\', 1 )[0]
+
+			self.ui.Render_result.setStyleSheet( "QFrame{ background-image: url(%s);}" %(imagePath.replace( '\\', '/') + '/scene1.jpg') )
+			self.ui.Render_result.repaint()
+			self.ui.Render_result.show()
+
+			logFile = imagePath.replace( '\\', '/') + '/scene1.log'
+			if os.path.isfile(logFile):
+				f = open(logFile)
+				for line in f:
+					self.ui.scrollAreaWidgetContents.insertPlainText(line)
+					self.ui.scrollAreaWidgetContents.moveCursor(QtGui.QTextCursor.End)
 		except:
+		 	# Will warn you if Arnold render path is not assigned in your environment
 			warnings.warn("Add Arnold to environment variable and re-open this window")
 
 	# Function to set shader color
@@ -211,8 +241,17 @@ class MyWin(QtWidgets.QMainWindow):
 		# Transform QColor to appropriate rgb color
 		self.col = ( rgba[0] / 255.0, rgba[1] / 255.0, rgba[2] / 255.0 )
 
+		# Set color of the Color button font depending on the background color
+		if rgba[0] * 0.299 + rgba[1] * 0.587 + rgba[2] * 0.114 > 105:
+			tColor = '#000000'
+		else:
+			tColor = '#bebebe'
+		self.ui.Color_Button.setStyleSheet( 'QPushButton{background-color: %s; color: %s; border: 1px solid #4d4d4d }' %( color.name(), tColor ) )
+
+
 if __name__=="__main__":
 	app = QtWidgets.QApplication(sys.argv)
 	myapp = MyWin()
 	myapp.show()
+
 	sys.exit(app.exec_())

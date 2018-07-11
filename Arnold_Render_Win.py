@@ -1,14 +1,7 @@
-'''
-Requirements:
-Python 3
-Arnold IDE
-
-Set Arnold path in environment variables
-'''
-
 import os
 import sys
 import warnings
+import time
 
 paths = (os.getenv("Path"))
 arnoldPaths = [ x for x in paths.split(";") if "Arnold" in x ]
@@ -22,7 +15,7 @@ except:
 	warnings.warn("Add Arnold to environment variable and re-open this window")
 
 from PyQt5 import QtCore, QtGui, QtWidgets
-
+from PyQt5.QtCore import pyqtSignal
 
 class Ui_AR_Win(object):
 
@@ -50,19 +43,21 @@ class Ui_AR_Win(object):
 
 		# Add Render button
 		self.Render_Button = QtWidgets.QPushButton(self.centralwidget)
-		self.Render_Button.setMinimumSize(QtCore.QSize(0, 30))
+		self.Render_Button.setMinimumSize(QtCore.QSize(80, 30))
 		self.Render_Button.setObjectName("Render_Button")
 
 		# Attach render button to Horizontal layout
 		self.horizontalLayout.addWidget(self.Render_Button)
 
-		# Create spacer to make the space between Color picker button and Arnold browse line
-		spacerItem = QtWidgets.QSpacerItem(440, 20, QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Minimum)
-		self.horizontalLayout.addItem(spacerItem)
+		self.progress = QtWidgets.QProgressBar(self.centralwidget)
+		self.progress.setGeometry(20, 20, 20, 20)
+
+		# Attach render button to Horizontal layout
+		self.horizontalLayout.addWidget(self.progress)
 
 		# Add Color picker button
 		self.Color_Button = QtWidgets.QPushButton(self.centralwidget)
-		self.Color_Button.setMinimumSize(QtCore.QSize(0, 30))
+		self.Color_Button.setMinimumSize(QtCore.QSize(80, 30))
 		self.Color_Button.setObjectName("Color_Button")
 
 		# Attach color button to Horizontal layout
@@ -108,42 +103,49 @@ class Ui_AR_Win(object):
 		self.Color_Button.setText(_translate("Arnold Win", "Object color"))
 
 
-class MyWin(QtWidgets.QMainWindow):
+class QThread1(QtCore.QThread):
 
-	# Initialize the main window
+	sig1 = pyqtSignal(str)
+	tempPath = os.environ['TEMP'].replace( '\\', '/') + "/"
+	logFile = tempPath + 'scene1.log'
+
 	def __init__(self, parent=None):
-		QtWidgets.QMainWindow.__init__(self, parent)
-		self.ui = Ui_AR_Win()
-		self.ui.setupUi(self)
+		QtCore.QThread.__init__(self, parent)
+		self.lineCount = 0
 
-		# Connect functions to the buttons
-		self.ui.Render_Button.clicked.connect(self.Render)
-		self.ui.Color_Button.clicked.connect(self.Picker)
+	def run(self):
+		self.running = True
+		while self.running:
+			try:
+				thefile = open(self.logFile, 'rb')
 
-		# Set dark grey color to the main window
-		self.setStyleSheet( 'QMainWindow{ background-color:#1f1f1f }' )
+				lines = thefile.readlines()
 
-		# Set dark grey color to tehe Render button
-		self.ui.Render_Button.setStyleSheet( 'QPushButton{ background-color: #444444; border: 1px solid #4d4d4d; color: #919c9c }' )
+				if self.lineCount == len(lines):
+					time.sleep(0.1)
+					continue
 
-		# Set the initial color as red one
-		self.col = (1.0, 0.02, 0.02)
-		init_Color_Button = [ x * 255.0 for x in self.col ]
-		self.ui.Color_Button.setStyleSheet( 'QPushButton{ background-color:rgb(%s,%s,%s); border: 1px solid #4d4d4d }' % ( init_Color_Button[0], init_Color_Button[1], init_Color_Button[2] ) )
+				for x in range( self.lineCount, len(lines) ):
+					self.sig1.emit(str(lines[x]))
+				self.lineCount = len(lines)
 
-		# Set Render Image widget color
-		self.ui.Render_result.setStyleSheet( 'QFrame { border: 1px solid #414141 }' )
+			except Exception as err:
+				pass
 
-		# Set Log Output text color
-		self.ui.scrollAreaWidgetContents.setStyleSheet( 'QTextEdit { background-color: #444444; border: 1px solid #414141; color: #919c9c }' )
 
-	# Called when the Render button is pressed
-	def Render(self):
+class QThread2(QtCore.QThread):
 
-		try:
+	def __init__(self, parent=None):
+		QtCore.QThread.__init__(self, parent)
+
+	def run(self):
+		self.running = True
+
+		while self.running:
 			tempPath = os.environ['TEMP'].replace( '\\', '/') + "/"
 			logFile = tempPath + 'scene1.log'
 			jpgFile = tempPath + 'scene1.jpg'
+
 			AiBegin()
 			AiMsgSetLogFileName(logFile)
 			AiMsgSetConsoleFlags(AI_LOG_ALL)
@@ -213,18 +215,76 @@ class MyWin(QtWidgets.QMainWindow):
 			# Arnold session shutdown
 			AiEnd()
 
+			self.running = False
+
+
+class MyWin(QtWidgets.QMainWindow):
+
+	# Initialize the main window
+	def __init__(self, parent=None):
+		QtWidgets.QMainWindow.__init__(self, parent)
+		self.ui = Ui_AR_Win()
+		self.ui.setupUi(self)
+
+		# Connect functions to the buttons
+		self.ui.Render_Button.clicked.connect(self.Render)
+		self.ui.Color_Button.clicked.connect(self.Picker)
+
+		# Set dark grey color to the main window
+		self.setStyleSheet( 'QMainWindow{ background-color:#1f1f1f }' )
+
+		# Set dark grey color to tehe Render button
+		self.ui.Render_Button.setStyleSheet( 'QPushButton{ background-color: #444444; border: 1px solid #4d4d4d; color: #919c9c }' )
+
+		# Set the initial color as red one
+		self.col = (1.0, 0.02, 0.02)
+		init_Color_Button = [ x * 255.0 for x in self.col ]
+		self.ui.Color_Button.setStyleSheet( 'QPushButton{ background-color:rgb(%s,%s,%s); border: 1px solid #4d4d4d }' % ( init_Color_Button[0], init_Color_Button[1], init_Color_Button[2] ) )
+
+		# Set Render Image widget color
+		self.ui.Render_result.setStyleSheet( 'QFrame { border: 1px solid #414141 }' )
+
+		# Set Log Output text color
+		self.ui.scrollAreaWidgetContents.setStyleSheet( 'QTextEdit { background-color: #444444; border: 1px solid #414141; color: #919c9c }' )
+
+		# Set Log Output text color
+		self.ui.progress.setStyleSheet( 'QProgressBar { text-align: center; background-color: #444444; border-color: #414141; color: #919c9c} QProgressBar::chunk{background-color: #646464;} ' )
+
+		self.tempPath = os.environ['TEMP'].replace( '\\', '/') + "/"
+		open(self.tempPath + 'scene1.log' , 'w').close()
+
+		sig1 = pyqtSignal(str)
+		self.thread1 = QThread1()
+		self.thread1.start()
+		self.thread1.sig1.connect(self.on_info)
+
+	# Called when the Render button is pressed
+	def Render(self):
+		self.on_but3()
+		self.thread1.lineCount = 0
+
+	def on_but3(self):
+		self.thread3 = QThread2()
+		self.thread3.start()
+		self.thread3.col = self.col
+
+	def on_info(self, info ):
+
+		self.ui.scrollAreaWidgetContents.append(str(info))
+		self.ui.scrollAreaWidgetContents.moveCursor(QtGui.QTextCursor.End)
+		if 'Arnold shutdown' in info:
+			jpgFile = self.tempPath + 'scene1.jpg'
 			self.ui.Render_result.setStyleSheet( "QFrame{ background-image: url(%s);}" %jpgFile )
 			self.ui.Render_result.repaint()
 			self.ui.Render_result.show()
-
-			if os.path.isfile(logFile):
-				f = open(logFile)
-				for line in f:
-					self.ui.scrollAreaWidgetContents.insertPlainText(line)
-					self.ui.scrollAreaWidgetContents.moveCursor(QtGui.QTextCursor.End)
-		except:
-		 	# Will warn you if Arnold render path is not assigned in your environment
-			warnings.warn("Add Arnold to environment variable and re-open this window")
+		elif '% done' in info:
+			words = info.split( ' ' )
+			num = [ x for x in words if '%' in x ]
+			progressPer = float(num[0].replace( '%', '' ) )
+			if progressPer == 100:
+				self.ui.progress.setValue( 0 )
+			else:
+				self.ui.progress.setValue( progressPer )
 
 	# Function to set shader color
 	def Picker( self ):
@@ -244,9 +304,8 @@ class MyWin(QtWidgets.QMainWindow):
 		self.ui.Color_Button.setStyleSheet( 'QPushButton{background-color: %s; color: %s; border: 1px solid #4d4d4d }' %( color.name(), tColor ) )
 
 
-if __name__=="__main__":
+if __name__ == "__main__":
 	app = QtWidgets.QApplication(sys.argv)
 	myapp = MyWin()
 	myapp.show()
-
 	sys.exit(app.exec_())

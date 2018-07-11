@@ -13,18 +13,13 @@ import warnings
 paths = (os.getenv("Path"))
 arnoldPaths = [ x for x in paths.split(";") if "Arnold" in x ]
 for a in arnoldPaths:
-	if a.endswith("python\\"):
-		sys.path.append(a)
-		break
-	elif "Arnold" in a.rsplit("\\", 1)[0]:
-		sys.path.append(a)
+	sys.path.append(a)
 
 try:
 	from arnold import *
 except:
 	# Will warn you if Arnold render path is not assigned in your environment
 	warnings.warn("Add Arnold to environment variable and re-open this window")
-
 
 from PyQt5 import QtCore, QtGui, QtWidgets
 
@@ -146,8 +141,11 @@ class MyWin(QtWidgets.QMainWindow):
 	def Render(self):
 
 		try:
+			tempPath = os.environ['TEMP'].replace( '\\', '/') + "/"
+			logFile = tempPath + 'scene1.log'
+			jpgFile = tempPath + 'scene1.jpg'
 			AiBegin()
-			AiMsgSetLogFileName("scene1.log")
+			AiMsgSetLogFileName(logFile)
 			AiMsgSetConsoleFlags(AI_LOG_ALL)
 
 			# create sphere
@@ -196,7 +194,7 @@ class MyWin(QtWidgets.QMainWindow):
 			# create an output driver node
 			driver = AiNode("driver_jpeg")
 			AiNodeSetStr(driver, "name", "mydriver")
-			AiNodeSetStr(driver, "filename", "scene1.jpg")
+			AiNodeSetStr(driver, "filename", jpgFile)
 			AiNodeSetFlt(driver, "gamma", 2.2)
 
 			# create a gaussian filter node
@@ -215,13 +213,10 @@ class MyWin(QtWidgets.QMainWindow):
 			# Arnold session shutdown
 			AiEnd()
 
-			imagePath = os.path.dirname(os.path.realpath(__file__))
-
-			self.ui.Render_result.setStyleSheet( "QFrame{ background-image: url(%s);}" %(imagePath.replace( '\\', '/') + '/scene1.jpg') )
+			self.ui.Render_result.setStyleSheet( "QFrame{ background-image: url(%s);}" %jpgFile )
 			self.ui.Render_result.repaint()
 			self.ui.Render_result.show()
 
-			logFile = imagePath.replace( '\\', '/') + '/scene1.log'
 			if os.path.isfile(logFile):
 				f = open(logFile)
 				for line in f:

@@ -215,7 +215,7 @@ class MyWin(QtWidgets.QMainWindow):
 			# Arnold session shutdown
 			AiEnd()
 
-			imagePath = sys.argv[0].rsplit( '\\', 1 )[0]
+			imagePath = os.path.dirname(os.path.realpath(__file__))
 
 			self.ui.Render_result.setStyleSheet( "QFrame{ background-image: url(%s);}" %(imagePath.replace( '\\', '/') + '/scene1.jpg') )
 			self.ui.Render_result.repaint()
